@@ -5,6 +5,36 @@ from tkinter import filedialog as fd
 from tkinter import messagebox
 from pandas import read_csv, errors
 
+from math import sqrt
+import sys
+class MockSerial():
+    
+    ''' Mock serial class for testing the GUI without an Arduino '''
+
+    def __init__(self):
+        self.colcount = 0
+
+    ''' Write data to stdout instead of to the serial port'''
+    def write_data(self, data):
+        sys.stdout.write(str(data))
+        self.colcount += 1
+        if self.colcount > 78:
+            sys.stdout.write('\n')
+            self.colcount = 0
+        sys.stdout.flush()
+        if(len(data) > 1):
+            print('\n')
+            self.print_list_as_matrix([int(item) for item in data],
+                8, 8)
+        
+    ''' Print given list as a num_col by num_row matrix '''
+    def print_list_as_matrix(self, lst, num_col, num_row):
+        for row in range(num_row):
+            for col in range(num_col):
+                print(lst[row*num_col + col], end='\t')
+            print('\n')
+
+
 class Application(ttk.Frame):
 
     ''' The main GUI frame '''
@@ -12,7 +42,7 @@ class Application(ttk.Frame):
     def __init__(self, parent):
         ttk.Frame.__init__(self, parent)
         # get the arduino port number
-        # self.arduino = ArduinoPort()
+        self.arduino = MockSerial() #ArduinoPort()
         # create an array of pixel values
         self.pixel_vals = []
         # create any widgets to display in the frame
@@ -46,11 +76,22 @@ class Application(ttk.Frame):
         btn_import_img = ttk.Button(self, width=12, text="Import Image",
             command=self.import_image)
         btn_import_img.grid(row=1, column=2, sticky="S", pady=0)
-
+        
+        # import .csv
         btn_import_csv = ttk.Button(self, width=12, text="Import .CSV",
             command=self.import_csv)
         btn_import_csv.grid(row=2, column=2, sticky="S", pady=0)
 
+        # serial write data
+        btn_serial_write = ttk.Button(self, width=12, text="Send Data",
+            command=self.serial_write_data)
+        btn_serial_write.grid(row=3, column=2, sticky="S", pady=0)
+
+    ''' Write pixel values to the Arduino serial port '''
+    def serial_write_data(self):
+        serial_data = bytearray(self.pixel_vals)
+        self.arduino.write_data(serial_data)
+        
     ''' Updates all images and pixel data after importing a new input image '''
     def set_input_image(self, image):
         # input image
@@ -107,6 +148,19 @@ class Application(ttk.Frame):
             for row in df.values:
                 self.pixel_vals += list(row)
             self.generate_images_from_pixel_vals()
+
+    ''' Updates the images to reflect the state of pixel_vals after .csv load '''
+    def generate_images_from_pixel_vals(self):
+        pattern_img = Image.new('L', (8,8))
+        pattern_img.putdata(self.pixel_vals)
+        img = pattern_img.resize((130,130), Image.NEAREST)
+        img = ImageTk.PhotoImage(img)
+        self.lif_input.set_image(img)
+        self.lif_grayscale.set_image(img)
+        self.lif_pixelize.set_image(img)
+        img = self.draw_pattern_preview(pattern_img)
+        img = ImageTk.PhotoImage(img)
+        self.lif_pattern.set_image(img)
 
     ''' Generate the pattern preview '''
     def draw_pattern_preview(self, pattern_img):
