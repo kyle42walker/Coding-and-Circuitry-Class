@@ -4,36 +4,79 @@ from PIL import ImageTk, Image, ImageOps, ImageDraw, UnidentifiedImageError
 from tkinter import filedialog as fd
 from tkinter import messagebox
 from pandas import read_csv, errors
+import serial
+import serial.tools.list_ports
+from serial.serialutil import SerialException
 
-from math import sqrt
-import sys
-class MockSerial():
-    
-    ''' Mock serial class for testing the GUI without an Arduino '''
+# import sys
+# class MockSerial():
+
+#     ''' Mock serial class for testing the GUI without an Arduino '''
+
+#     def __init__(self):
+#         self.colcount = 0
+
+#     ''' Write data to stdout instead of to the serial port'''
+#     def write_data(self, data):
+#         sys.stdout.write(str(data))
+#         self.colcount += 1
+#         if self.colcount > 78:
+#             sys.stdout.write('\n')
+#             self.colcount = 0
+#         sys.stdout.flush()
+#         if(len(data) > 1):
+#             print('\n')
+#             self.print_list_as_matrix([int(item) for item in data], 8, 8)
+
+#     ''' Print given list as a num_col by num_row matrix '''
+#     def print_list_as_matrix(self, lst, num_col, num_row):
+#         for row in range(num_row):
+#             for col in range(num_col):
+#                 print(lst[row*num_col + col], end='\t')
+#             print('\n')
+
+
+class ArduinoPort():
+
+    ''' Serial port for communicating with the Arduino '''
 
     def __init__(self):
-        self.colcount = 0
+        port = self.get_arduino_port()
+        self.serial_writer = serial.Serial(port, 115200)
 
-    ''' Write data to stdout instead of to the serial port'''
+    ''' Get port name for the connected Arduino with the lowest COM port ID '''
+    def get_arduino_port(self):
+        arduino_ports = [
+            p.device
+            for p in serial.tools.list_ports.comports()
+            if p.vid in [0x2341, 0x2A03, 0x1B4F, 0x239A, 0x1A86]  # vendor IDs
+        ]
+        if not arduino_ports:       # No Arduinos found
+            return None
+        if len(arduino_ports) > 1:
+            message = "More than one Arduino is currently connected.\n"
+            message += "Selecting Arduino with the lowest COM port ID..."
+            messagebox.showwarning("Multiple Arduinos Detected", message)
+            return arduino_ports[0]
+
+    ''' Send data to the connected Arduino over the serial COM port '''
     def write_data(self, data):
-        sys.stdout.write(str(data))
-        self.colcount += 1
-        if self.colcount > 78:
-            sys.stdout.write('\n')
-            self.colcount = 0
-        sys.stdout.flush()
-        if(len(data) > 1):
-            print('\n')
-            self.print_list_as_matrix([int(item) for item in data],
-                8, 8)
-        
-    ''' Print given list as a num_col by num_row matrix '''
-    def print_list_as_matrix(self, lst, num_col, num_row):
-        for row in range(num_row):
-            for col in range(num_col):
-                print(lst[row*num_col + col], end='\t')
-            print('\n')
-
+        if not data:
+            message = "Error loading pixel_vals data.\n"
+            message += "Try reloading a file or restarting the application."
+            messagebox.showerror("No Serial Data Found", message)
+            return
+        try:
+            self.serial_writer.write('<data>'.encode())
+            self.serial_writer.write(data)
+            self.serial_writer.write('</data>'.encode())
+        except SerialException:
+            message = "The Arduino was disconnected or has changed COM ports.\n"
+            message += "Try resending the data, using a different USB port,"
+            message += " or restarting the application."
+            messagebox.showerror("Arduino Connection Error", message)
+            self.serial_writer.close()
+            self.serial_writer = serial.Serial(self.get_arduino_port(), 115200)
 
 class Application(ttk.Frame):
 
@@ -42,7 +85,7 @@ class Application(ttk.Frame):
     def __init__(self, parent):
         ttk.Frame.__init__(self, parent)
         # get the arduino port number
-        self.arduino = MockSerial() #ArduinoPort()
+        self.arduino = ArduinoPort() # MockSerial()
         # create an array of pixel values
         self.pixel_vals = []
         # create any widgets to display in the frame
@@ -139,7 +182,7 @@ class Application(ttk.Frame):
         if filename:
             try:
                 df = read_csv(filename, header=None, prefix='Column ')
-            except errors.ParserError:
+            except (errors.ParserError, UnicodeDecodeError):
                 message = "An unsupported file type was selected.\n"
                 message += "Only .CSV files may be read in this method."
                 messagebox.showerror("Unrecognized File Format", message)
@@ -149,7 +192,7 @@ class Application(ttk.Frame):
                 self.pixel_vals += list(row)
             self.generate_images_from_pixel_vals()
 
-    ''' Updates the images to reflect the state of pixel_vals after .csv load '''
+    ''' Update the images to reflect the state of pixel_vals after .csv load '''
     def generate_images_from_pixel_vals(self):
         pattern_img = Image.new('L', (8,8))
         pattern_img.putdata(self.pixel_vals)
