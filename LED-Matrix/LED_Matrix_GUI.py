@@ -57,7 +57,7 @@ class ArduinoPort():
             message = "More than one Arduino is currently connected.\n"
             message += "Selecting Arduino with the lowest COM port ID..."
             messagebox.showwarning("Multiple Arduinos Detected", message)
-            return arduino_ports[0]
+        return arduino_ports[0]
 
     ''' Send data to the connected Arduino over the serial COM port '''
     def write_data(self, data):
@@ -78,6 +78,7 @@ class ArduinoPort():
             self.serial_writer.close()
             self.serial_writer = serial.Serial(self.get_arduino_port(), 115200)
 
+
 class Application(ttk.Frame):
 
     ''' The main GUI frame '''
@@ -94,7 +95,6 @@ class Application(ttk.Frame):
         self.grid()
 
     def create_widgets(self):
-        
         ## IMAGES
         # display input image
         self.lif_input = LabeledImageFrame(self, "Input Image")
@@ -108,9 +108,9 @@ class Application(ttk.Frame):
         # display pattern preview with labeled pixel brightness values
         self.lif_pattern = LabeledImageFrame(self, "Pattern Preview")
         self.lif_pattern.grid(row=1, column=0, padx=10, pady=10,
-                              columnspan=2, rowspan=4)
+            columnspan=2, rowspan=4)
         # initial image on application load
-        init_img = Image.open("Abstract_art.png")
+        init_img = Image.open("Resource/Images/init_img.png")
         init_img = init_img.resize((130, 130), Image.ANTIALIAS)
         self.set_input_image(init_img)
 
@@ -119,12 +119,10 @@ class Application(ttk.Frame):
         btn_import_img = ttk.Button(self, width=12, text="Import Image",
             command=self.import_image)
         btn_import_img.grid(row=1, column=2, sticky="S", pady=0)
-        
         # import .csv
         btn_import_csv = ttk.Button(self, width=12, text="Import .CSV",
             command=self.import_csv)
         btn_import_csv.grid(row=2, column=2, sticky="S", pady=0)
-
         # serial write data
         btn_serial_write = ttk.Button(self, width=12, text="Send Data",
             command=self.serial_write_data)
@@ -134,24 +132,21 @@ class Application(ttk.Frame):
     def serial_write_data(self):
         serial_data = bytearray(self.pixel_vals)
         self.arduino.write_data(serial_data)
-        
+
     ''' Updates all images and pixel data after importing a new input image '''
     def set_input_image(self, image):
         # input image
         img = ImageTk.PhotoImage(image)
         self.lif_input.set_image(img)
-
         # grayscale image
         gray_img = ImageOps.grayscale(image)
         img = ImageTk.PhotoImage(gray_img)
         self.lif_grayscale.set_image(img)
-
         # pixelized image
         pattern_img = gray_img.resize((8, 8))
         pixelize_img = pattern_img.resize(gray_img.size, Image.NEAREST)
         img = ImageTk.PhotoImage(pixelize_img)
         self.lif_pixelize.set_image(img)
-
         # pattern preview
         self.pixel_vals = list(pattern_img.getdata())
         preview_img = self.draw_pattern_preview(pattern_img)
@@ -248,7 +243,13 @@ class LabeledImageFrame(ttk.LabelFrame):
 def main():
     root = tk.Tk()
     root.title("LED Matrix Configurator")
+    root.iconphoto(False, tk.PhotoImage(file='Resource/Images/icon.png'))
+
+    root.tk.call("source", "Resource/Theme/forest-dark.tcl")
+    ttk.Style().theme_use("forest-dark")
+
     app = Application(root)
     root.mainloop()
+
 
 if __name__ == '__main__': main()
