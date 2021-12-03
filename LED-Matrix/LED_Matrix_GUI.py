@@ -108,7 +108,7 @@ class Application(ttk.Frame):
         # display pattern preview with labeled pixel brightness values
         self.lif_pattern = LabeledImageFrame(self, "Pattern Preview")
         self.lif_pattern.grid(row=1, column=0, padx=10, pady=10,
-            columnspan=2, rowspan=4)
+            columnspan=2, rowspan=5)
         # initial image on application load
         init_img = Image.open("Resource/Images/init_img.png")
         init_img = init_img.resize((130, 130), Image.ANTIALIAS)
@@ -123,10 +123,14 @@ class Application(ttk.Frame):
         btn_import_csv = ttk.Button(self, width=12, text="Import .CSV",
             command=self.import_csv)
         btn_import_csv.grid(row=2, column=2, sticky="S", pady=0)
+        # reset (turn off all LEDs)
+        btn_reset = ttk.Button(self, width=12, text="Reset",
+            command=self.reset_leds)
+        btn_reset.grid(row=3, column=2, sticky="S", pady=0)
         # serial write data
         btn_serial_write = ttk.Button(self, width=12, text="Send Data",
             command=self.serial_write_data)
-        btn_serial_write.grid(row=3, column=2, sticky="S", pady=0)
+        btn_serial_write.grid(row=4, column=2, sticky="S", pady=0)
 
     ''' Write pixel values to the Arduino serial port '''
     def serial_write_data(self):
@@ -186,6 +190,11 @@ class Application(ttk.Frame):
             for row in df.values:
                 self.pixel_vals += list(row)
             self.generate_images_from_pixel_vals()
+
+    ''' Reset all LEDs to off state '''
+    def reset_leds(self):
+        serial_data = bytearray([0] * 64)
+        self.arduino.write_data(serial_data)
 
     ''' Update the images to reflect the state of pixel_vals after .csv load '''
     def generate_images_from_pixel_vals(self):

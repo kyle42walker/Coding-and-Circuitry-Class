@@ -1,23 +1,31 @@
 #include <Arduino.h>
-#include <MD_Parola.h>
+#include <LedControl.h>
+
+// Hardware set up:
+const int DIN = 11, CS = 10, CLK = 13;
+LedControl dotMatrix = LedControl(DIN, CLK, CS, 0);
+
+const int NUM_ROWS = 8, NUM_COLS = 8, NUM_LEDS = NUM_ROWS * NUM_COLS;
+byte led_vals[NUM_LEDS];
+boolean new_data = false;
 
 typedef enum receive_status {
   STANDBY, READING_DATA, READING_START, READING_END
   } Receive_Status;
 
-const int NUM_LEDS = 64;
-byte led_vals[NUM_LEDS];
-boolean new_data = false;
-
 void receive_data();
 void update_led_matrix();
 
 void setup() {
-  // initialize all the LED Matrix stuff
-
+  // initialize LED dot matrix
+  dotMatrix.shutdown(0,false);
+  dotMatrix.setIntensity(0,8);
+  dotMatrix.clearDisplay(0);
+  // initialize led_vals array
   for (int i = 0; i < NUM_LEDS; i++) {
     led_vals[i] = 0;
   }
+  // open serial comms
   Serial.begin(115200);
 }
 
@@ -87,7 +95,6 @@ void receive_data() {
         marker_index = 1;
         recv_stat = READING_END;
       }
-
       // otherwise... continue adding to led_vals
       else {
         led_vals[led_index++] = val;
@@ -105,4 +112,18 @@ void receive_data() {
       }
     }
   }
+}
+
+void update_led_matrix() {
+  // no new data... do nothing
+  if (!new_data) return;
+  // send all data from led_vals to the physial LEDs
+  int row, col;
+  for (row = 0; row < NUM_ROWS; ++row) {
+    for (col = 0; col < NUM_COLS; ++col) {
+      dotMatrix.setLed(0, row, col, led_vals[NUM_COLS*row + col] >= 127);
+    }
+  }
+  // done processing data
+  new_data = false;
 }
